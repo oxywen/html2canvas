@@ -389,7 +389,9 @@ export class CanvasRenderer extends Renderer {
 
         if (isTextInputElement(container) && container.value.length) {
             const [font, fontFamily, fontSize] = this.createFontStyle(styles);
-            const {baseline} = this.fontMetrics.getMetrics(fontFamily, fontSize);
+            const metrics = this.fontMetrics.getMetrics(fontFamily, fontSize);
+            let baseline = metrics.baseline;
+            const middle = metrics.middle;
 
             this.ctx.font = font;
             this.ctx.fillStyle = asString(styles.color);
@@ -398,6 +400,7 @@ export class CanvasRenderer extends Renderer {
             this.ctx.textAlign = canvasTextAlign(container.styles.textAlign);
 
             const bounds = contentBox(container);
+            baseline = bounds.height / 2 + baseline - middle;
 
             let x = 0;
 
@@ -410,7 +413,7 @@ export class CanvasRenderer extends Renderer {
                     break;
             }
 
-            const textBounds = bounds.add(x, 0, 0, -bounds.height / 2 + 1);
+            const textBounds = bounds.add(x, 0, 0, 0);
 
             this.ctx.save();
             this.path([
