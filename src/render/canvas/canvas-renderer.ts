@@ -9,7 +9,13 @@ import {BACKGROUND_CLIP} from '../../css/property-descriptors/background-clip';
 import {BoundCurves, calculateBorderBoxPath, calculateContentBoxPath, calculatePaddingBoxPath} from '../bound-curves';
 import {BezierCurve, isBezierCurve} from '../bezier-curve';
 import {Vector} from '../vector';
-import {CSSImageType, CSSURLImage, isLinearGradient, isRadialGradient} from '../../css/types/image';
+import {
+    CSSImageType,
+    CSSLinearGradientImage,
+    CSSURLImage,
+    isLinearGradient,
+    isRadialGradient
+} from '../../css/types/image';
 import {
     parsePathForBorder,
     parsePathForBorderDoubleInner,
@@ -183,12 +189,48 @@ export class CanvasRenderer extends Renderer {
         this.ctx.textBaseline = 'alphabetic';
         const {baseline, middle} = this.fontMetrics.getMetrics(fontFamily, fontSize);
         const paintOrder = styles.paintOrder;
-
+        let textWidth = 0;
+        for (let i = 0; i < text.textBounds.length; i++) {
+            textWidth += text.textBounds[i].bounds.width;
+        }
+        const textLeft = text.textBounds[0].bounds.left;
+        const textTop = text.textBounds[0].bounds.top;
+        const textHeight = text.textBounds[0].bounds.height;
         text.textBounds.forEach((text) => {
             paintOrder.forEach((paintOrderLayer) => {
                 switch (paintOrderLayer) {
                     case PAINT_ORDER_LAYER.FILL:
-                        this.ctx.fillStyle = asString(styles.color);
+                        if (styles.backgroundClip[0] == 3) {
+                            if (styles.backgroundImage[0] === undefined) {
+                                this.ctx.fillStyle = asString(styles.backgroundColor);
+                            } else if (styles.backgroundImage[0].type === CSSImageType.LINEAR_GRADIENT) {
+                                const bg = styles.backgroundImage[0] as CSSLinearGradientImage;
+                                const decoration = calculateGradientDirection(bg.angle, textWidth, textHeight);
+                                const lineLength = decoration[0];
+                                const x0 = decoration[1];
+                                const x1 = decoration[2];
+                                const y0 = decoration[3];
+                                const y1 = decoration[4];
+                                const ele = document.createElement('canvas');
+                                ele.width = textWidth;
+                                ele.height = textHeight;
+                                const xctx = ele.getContext('2d');
+                                if (!!xctx) {
+                                    const gradient = xctx.createLinearGradient(
+                                        textLeft + x0,
+                                        textTop + y0,
+                                        textLeft + x1,
+                                        textTop + y1
+                                    );
+                                    processColorStops(bg.stops, lineLength).forEach((colorStop) => {
+                                        return gradient.addColorStop(colorStop.stop, asString(colorStop.color));
+                                    });
+                                    this.ctx.fillStyle = gradient;
+                                }
+                            }
+                        } else {
+                            this.ctx.fillStyle = asString(styles.color);
+                        }
                         this.renderTextWithLetterSpacing(text, styles.letterSpacing, baseline);
                         const textShadows: TextShadow = styles.textShadow;
 
@@ -610,6 +652,30 @@ export class CanvasRenderer extends Renderer {
                     this.renderRepeat(path, pattern, x, y);
                 }
             } else if (isLinearGradient(backgroundImage)) {
+                if(container.styles.backgroundClip[0] == BACKGROUND_CLIP.TEXT) {
+                    const calculate = calculateBackgroundRendering(container, index, [null, null, null]);
+                    const path = calculate[0];
+                    const x = calculate[1];
+                    const y = calculate[2];
+                    const width = calculate[3];
+                    const height = calculate[4];
+                    const ele = document.createElement('canvas');
+                    ele.width = width;
+                    ele.height = height;
+                    const ctx = ele.getContext('2d');
+                    if(!!ctx){
+                        ctx.globalAlpha = 0;
+                        ctx.fillStyle = "#000000";
+                        ctx.fillRect(0, 0, width, height);
+                        if (width > 0 && height > 0) {
+                            const pattern = this.ctx.createPattern(ele, 'repeat');
+                            if(!!pattern){
+                                this.renderRepeat(path, pattern, x, y);
+                                break;
+                            }
+                        }
+                    }
+                }
                 const [path, x, y, width, height] = calculateBackgroundRendering(container, index, [null, null, null]);
                 const [lineLength, x0, x1, y0, y1] = calculateGradientDirection(backgroundImage.angle, width, height);
 

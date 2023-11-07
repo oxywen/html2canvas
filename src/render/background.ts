@@ -22,6 +22,10 @@ export const calculateBackgroundPositioningArea = (
         return contentBox(element);
     }
 
+    if (backgroundOrigin === BACKGROUND_ORIGIN.TEXT) {
+        return contentBox(element);
+    }
+
     return paddingBox(element);
 };
 
@@ -31,6 +35,10 @@ export const calculateBackgroundPaintingArea = (backgroundClip: BACKGROUND_CLIP,
     }
 
     if (backgroundClip === BACKGROUND_CLIP.CONTENT_BOX) {
+        return contentBox(element);
+    }
+
+    if (backgroundClip === BACKGROUND_CLIP.TEXT) {
         return contentBox(element);
     }
 
